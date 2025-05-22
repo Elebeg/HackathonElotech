@@ -20,17 +20,37 @@ import { EloCoinsTransaction } from './elo-coins/elo-coins.entity';
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DATABASE_HOST'),
-        port: +configService.get<number>('DATABASE_PORT'),
-        username: configService.get('DATABASE_USERNAME'),
-        password: configService.get('DATABASE_PASSWORD'),
-        database: configService.get('DATABASE_NAME'),
-        entities: [User, Vote, EloCoinsTransaction],
-        synchronize: true, 
-        logging: true,
-      }),
+      useFactory: (configService: ConfigService) => {
+        // Railway automaticamente disponibiliza DATABASE_URL
+        const databaseUrl = configService.get('DATABASE_URL');
+        
+        if (databaseUrl) {
+          // Configuração para Railway usando DATABASE_URL
+          return {
+            type: 'postgres',
+            url: databaseUrl,
+            entities: [User, Vote, EloCoinsTransaction],
+            synchronize: true, // Para desenvolvimento
+            logging: false, // Desabilita logs em produção
+            ssl: {
+              rejectUnauthorized: false, // Necessário para Railway
+            },
+          };
+        } else {
+          // Configuração para desenvolvimento local
+          return {
+            type: 'postgres',
+            host: configService.get('DATABASE_HOST', 'localhost'),
+            port: +configService.get<number>('DATABASE_PORT', 5432),
+            username: configService.get('DATABASE_USERNAME', 'elocidadao'),
+            password: configService.get('DATABASE_PASSWORD', 'elocidadao123'),
+            database: configService.get('DATABASE_NAME', 'elocidadao'),
+            entities: [User, Vote, EloCoinsTransaction],
+            synchronize: true,
+            logging: true,
+          };
+        }
+      },
       inject: [ConfigService],
     }),
     PassportModule,
@@ -38,8 +58,10 @@ import { EloCoinsTransaction } from './elo-coins/elo-coins.entity';
       global: true,
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get('JWT_SECRET'),
-        signOptions: { expiresIn: configService.get('JWT_EXPIRES_IN') },
+        secret: configService.get('JWT_SECRET', 'elocidadao-super-secret-key-2024'),
+        signOptions: { 
+          expiresIn: configService.get('JWT_EXPIRES_IN', '7d') 
+        },
       }),
       inject: [ConfigService],
     }),
